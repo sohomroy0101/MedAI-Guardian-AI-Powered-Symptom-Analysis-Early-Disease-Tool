@@ -5,6 +5,7 @@ from sklearn import preprocessing
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from difflib import get_close_matches
+import os
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 app = Flask(__name__)
@@ -12,9 +13,12 @@ app.secret_key = "supersecret"
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# ------------------ Load Data (unchanged) ------------------
-training = pd.read_csv('Data/Training.csv')
-testing = pd.read_csv('Data/Testing.csv')
+# ------------------ Load Data (PATH FIXED for Render) ------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+training = pd.read_csv(os.path.join(BASE_DIR, 'Data', 'Training.csv'))
+testing = pd.read_csv(os.path.join(BASE_DIR, 'Data', 'Testing.csv'))
+
 training.columns = training.columns.str.replace(r"\.\d+$", "", regex=True)
 testing.columns  = testing.columns.str.replace(r"\.\d+$", "", regex=True)
 training = training.loc[:, ~training.columns.duplicated()]
@@ -33,18 +37,18 @@ severityDictionary, description_list, precautionDictionary = {}, {}, {}
 symptoms_dict = {symptom: idx for idx, symptom in enumerate(x)}
 
 def getDescription():
-    with open('MasterData/symptom_Description.csv') as csv_file:
+    with open(os.path.join(BASE_DIR, 'MasterData', 'symptom_Description.csv')) as csv_file:
         for row in csv.reader(csv_file):
             description_list[row[0]] = row[1]
 
 def getSeverityDict():
-    with open('MasterData/symptom_severity.csv') as csv_file:
+    with open(os.path.join(BASE_DIR, 'MasterData', 'symptom_severity.csv')) as csv_file:
         for row in csv.reader(csv_file):
             try: severityDictionary[row[0]] = int(row[1])
             except: pass
 
 def getprecautionDict():
-    with open('MasterData/symptom_precaution.csv') as csv_file:
+    with open(os.path.join(BASE_DIR, 'MasterData', 'symptom_precaution.csv')) as csv_file:
         for row in csv.reader(csv_file):
             precautionDictionary[row[0]] = [row[1], row[2], row[3], row[4]]
 
@@ -105,7 +109,6 @@ def chat():
     user_msg = request.json['message']
     step = session.get('step', 'welcome')
 
-    # replicate each console step
     if step == 'welcome':
         session['step'] = 'name'
         return jsonify(reply="🤖 Welcome to MedAI Guardian!\n I'm a AI-Powered Symptom Analysis & Early Disease Prediction Tool - Made by SOHOM ROY\n👉 What is your name?")
@@ -148,7 +151,6 @@ def chat():
         return jsonify(reply="👉 Any family history of similar illness?")
     elif step == 'family':
         session['family'] = user_msg
-        # guided disease-specific questions
         disease = session['pred_disease']
         disease_symptoms = list(training[training['prognosis'] == disease].iloc[0][:-1].index[
             training[training['prognosis'] == disease].iloc[0][:-1] == 1
@@ -158,14 +160,12 @@ def chat():
         session['step'] = 'guided'
         return ask_next_symptom()
     elif step == 'guided':
-        # record yes/no
         idx = session['ask_index'] - 1
         if idx >= 0 and idx < len(session['disease_syms']):
             if user_msg.strip().lower() == 'yes':
                 session['symptoms'].append(session['disease_syms'][idx])
         return ask_next_symptom()
     elif step == 'final':
-        # already answered all guided
         return final_prediction()
 
 def ask_next_symptom():
@@ -191,8 +191,9 @@ def final_prediction():
     text += "\n\n\n💡 " + random.choice(quotes)
     text += f"\n\n\nThank you for using the chatbot. Wishing you good health, {session['name']}!"
     return jsonify(reply=text)
-import os
 
+
+# ------------------ Render DEPLOY fix ------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
