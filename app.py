@@ -191,5 +191,8 @@ def final_prediction():
     text += "\n\n\n💡 " + random.choice(quotes)
     text += f"\n\n\nThank you for using the chatbot. Wishing you good health, {session['name']}!"
     return jsonify(reply=text)
+import os
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
